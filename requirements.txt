@@ -1,0 +1,4 @@
+Flask==2.3.2
+twilio==8.0.0
+python-dotenv
+gunicorn
