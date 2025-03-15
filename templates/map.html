@@ -1,1 +1,110 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Location</title>
+    <!-- Mapbox CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        #map {
+            width: 100%;
+            height: 500px;
+            margin-top: 20px;
+        }
+        .police-station-info {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>User Location</h1>
+    <p>Latitude: <span id="latitude">{{ latitude }}</span>, Longitude: <span id="longitude">{{ longitude }}</span></p>
+    <div id="map"></div>
+
+    <!-- Mapbox JavaScript -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.js"></script>
+    <script>
+        // Initialize Mapbox
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic29tYTEzMDkiLCJhIjoiY204OHRqOTAwMHE1ZjJsc2I0cnl2YnY0YSJ9.f1kxGHxm98mMAprix2ZW8Q';  // Replace with your Mapbox access token
+        const map = new mapboxgl.Map({
+            container: 'map',  // Container ID
+            style: 'mapbox://styles/mapbox/streets-v11',  // Map style
+            center: [{{ longitude }}, {{ latitude }}],  // Initial center (longitude, latitude)
+            zoom: 15  // Initial zoom level
+        });
+
+        // Add a marker at the user's location
+        const userMarker = new mapboxgl.Marker({ color: 'red' })
+            .setLngLat([{{ longitude }}, {{ latitude }}])
+            .addTo(map);
+
+        // Function to fetch nearby police stations
+        function fetchNearbyPoliceStations(latitude, longitude) {
+            fetch(`/nearby_police_stations?latitude=${latitude}&longitude=${longitude}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error(data.error);
+                        return;
+                    }
+
+                    // Add markers for each police station
+                    data.forEach(station => {
+                        const marker = new mapboxgl.Marker({ color: 'blue' })
+                            .setLngLat([station.longitude, station.latitude])
+                            .addTo(map);
+
+                        // Add a popup with station details
+                        const popup = new mapboxgl.Popup({ offset: 25 })
+                            .setHTML(`
+                                <div class="police-station-info">
+                                    <h3>${station.name}</h3>
+                                    <p>${station.address}</p>
+                                </div>
+                            `);
+
+                        marker.setPopup(popup);
+                    });
+                })
+                .catch(error => console.error('Error fetching police stations:', error));
+        }
+
+        // Fetch nearby police stations when the map loads
+        map.on('load', () => {
+            fetchNearbyPoliceStations({{ latitude }}, {{ longitude }});
+        });
+
+        // Function to fetch the latest location
+        function fetchLocation() {
+            const user_id = new URLSearchParams(window.location.search).get('user_id');
+            fetch(`/get_location?user_id=${user_id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.latitude && data.longitude) {
+                        // Update the user marker position
+                        userMarker.setLngLat([data.longitude, data.latitude]);
+
+                        // Update the latitude and longitude display
+                        document.getElementById('latitude').textContent = data.latitude;
+                        document.getElementById('longitude').textContent = data.longitude;
+
+                        // Pan the map to the new location
+                        map.setCenter([data.longitude, data.latitude]);
+
+                        // Fetch nearby police stations for the new location
+                        fetchNearbyPoliceStations(data.latitude, data.longitude);
+                    }
+                })
+                .catch(error => console.error('Error fetching location:', error));
+        }
+
+        // Fetch the location every 5 seconds
+        setInterval(fetchLocation, 5000);
+    </script>
+</body>
+</html>
